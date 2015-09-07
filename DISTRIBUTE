@@ -1,0 +1,6 @@
+Create a distribution package with the following command:
+
+python setup.py sdist
+rm -rf mbox_uploader_osx_tb.egg-info
+
+distribution tarbell will be in dist directory.
