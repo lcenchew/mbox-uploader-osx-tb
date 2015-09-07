@@ -14,7 +14,7 @@ python setup.py install --user
 
 4. Run the following command from the terminal prompt to process a mail migration:
 
-./mbox-uploader-osx.py
+./mbox-uploader-osx-tb.py
 
 
 Usage
