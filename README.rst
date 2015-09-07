@@ -22,6 +22,6 @@ Usage
 
 There are two command line switches:
 
-- --reauth : forces reauthentication<br />
+- --reauth : forces reauthentication
 - --redoall: forces reimporting of all messages in MBOX
 
