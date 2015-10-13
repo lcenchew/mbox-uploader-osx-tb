@@ -146,6 +146,8 @@ def createLabel(service, user_id, label_object):
     try:
         label = service.users().labels().create(userId=user_id,
                                                 body=label_object).execute()
+        print("\rLabel created for folder: {0}".format((label_object['name'].ljust(55,' ')[:53] + '..') if len(label_object['name'].ljust(55,' ')) > 55 else label_object['name'].ljust(55,' '))),
+        logging.info("Label created for folder: {0}".format(label_object['name']))
         return label['id']
     except errors.HttpError, error:
         logging.error('function createLabel: An error occurred: %s' % error)
@@ -318,28 +320,18 @@ def migrateMBOX(service, file, label, conn):
     # initialize number of failed messages
     total_failed = 0
     
-    # initialize labels
-    # one label will always be 'CATEGORY_PERSONAL'
-    # one label will be based on the label provided
-    # one label will be 'UNREAD' if the message being uploaded has yet to be read
-    labels = ['CATEGORY_PERSONAL',label]
-    
-    # iterate over all messages in mbox file
+   # iterate over all messages in mbox file
     msg_number = 0
     for message in mbox:
         msg_number += 1
         print(BS32+"Migrating message: {0} of {1}".format(str(msg_number).zfill(4),str(total_messages).zfill(4))),
         
-        # get message-id
-        message_id = message.__getitem__('message-id')
-        
-        # has message already been uploaded
-        if message_id in message_info:
-            # skip it. it has already been uploaded
-            # log some feedback
-            logging.info("Message {0} of {1} - Already Uploaded - Skipped".format(msg_number,total_messages))
-            continue
-        
+        # initialize labels
+        # one label will always be 'CATEGORY_PERSONAL'
+        # one label will be based on the label provided
+        # one label will be 'UNREAD' if the message being uploaded has yet to be read
+        labels = ['CATEGORY_PERSONAL',label]
+    
         # get x-mozilla-status value, if it exists
         x_mozilla_status = message.__getitem__('x-mozilla-status')
         
@@ -360,7 +352,41 @@ def migrateMBOX(service, file, label, conn):
         message.__delitem__('x-mozilla-status')
         message.__delitem__('x-mozilla-status2')
         
-        # extract raw message
+        # get message-id
+        message_id = message.__getitem__('message-id')
+        
+        # has message already been uploaded
+        if message_id in message_info:
+            # Yes.
+            # Check if current label is listed for this message
+            try:
+                response = service.users().messages().get(userId='me', id=message_info[message_id], format='minimal').execute()
+                msg_labels = response['labelIds']
+                missing_labels = [item for item in labels if item not in msg_labels]
+                if missing_labels:
+                    # Some label(s) are not set for this message.  Add missing label(s).
+                    try:
+                        label_modifications = {'addLabelIds': missing_labels, 'removeLabelIds': []}
+                        response = service.users().messages().modify(userId='me', id=message_info[message_id],
+                                                                     body=label_modifications).execute()
+                        logging.info("Message %s of %s - Added missing labels: %s" % (msg_number,total_messages,', '.join(missing_labels)))
+                        continue
+                    except errors.HttpError, error:
+                        logging.info("Message %s of %s - Error adding missing labels: %s - Error: %s" %
+                                      (msg_number,total_messages,', '.join(missing_labels),error))
+                        continue
+                    
+                # Message has already been uploaded and no labels need to be added. Skip it.
+                logging.info("Message {0} of {1} - Already Uploaded - Skipped".format(msg_number,total_messages))
+                continue
+            except errors.HttpError, e:
+                error = simplejson.loads(e.content)
+                if error['error']['code'] == 404:
+                    # Message already uploaded but has been deleted manually
+                    logging.info("Message %s of %s - Already Uploaded and Manually Deleted - Skipped" % (msg_number,total_messages))
+                continue
+
+         # extract raw message
         msg = message.as_string()
         
         # check message size is not greater than 35MB - 1024B (overhead just in case)
@@ -413,6 +439,8 @@ def migrateMBOX(service, file, label, conn):
         # close BaseIO object
         fh.close()
         
+    print("\r                                  "),
+    
     return total_messages, total_failed
       
 """
