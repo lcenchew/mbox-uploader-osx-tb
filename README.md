@@ -1,5 +1,5 @@
 # mbox-uploader-osx-tb
-Imports Thunderbird MBOX files to GMail
+Imports Thunderbird MBOX email messages to GMail
 
 ## Requirements:
    * Python 2.7
@@ -14,6 +14,7 @@ Imports Thunderbird MBOX files to GMail
 
 There are two command line switches:
 
+--help: provides usage message<br />
 --reauth : forces reauthentication<br />
---redoall: forces reimporting of all messages in MBOX
+--redoallmessages: forces reimporting of all messages in MBOX
 

@@ -77,11 +77,23 @@ sys.stdout = Unbuffered(sys.stdout)
 """
 def parseCommandLine():
     # parse command line arguments
-    # mbox-uploader-osx-tb.py [--reauth] [--redoallmessages]
+    # mbox-uploader-osx-tb.py [--reauth] [--redoallmessages] [--help]
     reauth = False
     redoall = False
-    options, remainder = getopt.getopt(sys.argv[1:], "", ['reauth', 'redoallmessages'])
+    options, remainder = getopt.getopt(sys.argv[1:], "", ['help', 'reauth', 'redoallmessages'])
     for opt in options:
+        if '--help' in opt:
+            print
+            print "Usage: mbox-uploader-osx-tb.py [--reauth] [--redoallmessages]"
+            print "       mbox-uploader-osx-tb.py [--help]"
+            print
+            print "       --help            : displays this message"
+            print "       --reauth          : forces reauthorization"
+            print "       --redoallmessages : migrated message database entries will be cleared for"
+            print "                         : the mailbox being migrated so that all messages will be"
+            print "                         : attempted to migrate again."
+            print
+            sys.exit()
         if '--reauth' in opt:
             reauth = True
         if '--redoallmessages' in opt:
