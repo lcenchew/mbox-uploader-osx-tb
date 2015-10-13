@@ -186,41 +186,42 @@ def checkAddLabel(service, label, current_labels):
         current_labels[label] = createLabel(service,'me',makeLabel(label))
         
 """
- * getMigratedMessageHashes
+ * getMigrateMessageInfo
  *
- * Retrieves a list of message hash values for already migrated messages.
+ * Retrieves message info (message-id, google id) from database for messages
+ * that have already been migrated from this mailbox.
  *
  * Args:
  *     conn: database connection handler
- *     redoall: indicates whether to remove all message hashes and migrate all messages again
+ *     mailbox : mailbox associated with messages
+ *     redoall: indicates whether to remove all message info and migrate all messages again
  *
  * Returns:
- *     message hash list
+ *     message info list
 """
-def getMigratedMessageHashes(conn,redoall):
+def getMigrateMessageInfo(conn,mailbox,redoall):
     c = conn.cursor()
 
-    # does message_hashes table exist?
-    message_hashes = []
-    c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?", ["table", "message_hashes"])
+    # does message_info table exist?
+    message_info = {}
+    c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?", ["table", "message_info"])
     if c.fetchone()[0] > 0:
-        # message_hashes table exists, retrieve message-id values
+        # message_info table exists, retrieve message-id and google id values
         if redoall:
-            c.execute("DELETE FROM message_hashes")
+            c.execute("DELETE FROM message_info where mailbox = ?", [mailbox])
             conn.commit()
-        c.execute("SELECT * FROM message_hashes")
+        c.execute("SELECT * FROM message_info where mailbox = ?", [mailbox])
         while True:
             row = c.fetchone()
             if row is None:
                 break
-            message_hash = row[0]
-            message_hashes.append(message_hash)
+            message_info[row[1]] = row[2]
     else:
         # create table
-        c.execute("CREATE TABLE message_hashes (message_hash text unique)")
+        c.execute("CREATE TABLE message_info (mailbox text, message_id text, google_id text, UNIQUE (mailbox, message_id))")
         conn.commit()
 
-    return message_hashes
+    return message_info
 
 """
  * getAuthCredentials
@@ -302,11 +303,12 @@ def getAuthCredentials(conn,reauth):
  *     service: Authorized Gmail API service instance.
  *     file: path to MBOX file
  *     label: label id to assign to MBOX messages
- *     message_hashes: list of hashes for all migrated messages
  *     conn: database connection handle
  *
 """
-def migrateMBOX(service, file, label, message_hashes, conn):
+def migrateMBOX(service, file, label, conn):
+    global message_info
+
     # open mbox file for reading
     mbox = mailbox.mbox(file)
 
@@ -328,9 +330,11 @@ def migrateMBOX(service, file, label, message_hashes, conn):
         msg_number += 1
         print(BS32+"Migrating message: {0} of {1}".format(str(msg_number).zfill(4),str(total_messages).zfill(4))),
         
+        # get message-id
+        message_id = message.__getitem__('message-id')
+        
         # has message already been uploaded
-        message_hash = md5.new(message.as_string()).hexdigest()
-        if message_hash in message_hashes:
+        if message_id in message_info:
             # skip it. it has already been uploaded
             # log some feedback
             logging.info("Message {0} of {1} - Already Uploaded - Skipped".format(msg_number,total_messages))
@@ -401,9 +405,9 @@ def migrateMBOX(service, file, label, message_hashes, conn):
                 break
             
         if not upload_failed:
-            conn.execute("INSERT into message_hashes VALUES ('{0}')".format(message_hash))
+            conn.execute("INSERT into message_info VALUES (?,?,?)", [mailroot,message_id,response['id']])
             conn.commit()
-            message_hashes.append(message_hash)
+            message_info[message_id]=response['id']
             logging.info('Message {0} of {1} - "{2}"- Upload Complete'.format(msg_number,total_messages,message['subject']))
 
         # close BaseIO object
@@ -468,9 +472,6 @@ current_labels["INBOX"] = "INBOX"
 current_labels["Inbox"] = "INBOX"
 current_labels["Incoming"] = "INBOX"
 current_labels["SENT"] = "SENT"
-
-# get list of message hashes for already migrated messages
-message_hashes = getMigratedMessageHashes(conn,redoall)
 
 # Set to Thunderbird Profiles directory
 TBPROFILES = os.path.expanduser('~') + '/Library/Thunderbird/Profiles'
@@ -555,6 +556,9 @@ total_failed = 0
 
 print("\nBeginning migration...\n")
 
+# get message information for this mailbox's already migrated messages
+message_info = getMigrateMessageInfo(conn,mailroot,redoall)
+
 # walk mail folder structure and determine mail folder hierarchy and MBOX files to migrate
 for dirName, subdirList, fileList in os.walk(mailroot):
     # Option 1 : Attempt to migrate Trash folder
@@ -569,7 +573,7 @@ for dirName, subdirList, fileList in os.walk(mailroot):
             print(" *                                "),
             
             # migrate MBOX messages
-            migrateMBOX(service, dirName + '\\Trash', current_labels[label], message_hashes, conn)
+            migrateMBOX(service, dirName + '\\Trash', current_labels[label], conn)
         continue
     '''
     for mboxFile in fileList:
@@ -605,7 +609,7 @@ for dirName, subdirList, fileList in os.walk(mailroot):
         print(" *                                "),
         
         # migrate MBOX messages
-        number_messages, number_failed = migrateMBOX(service, dirName + '/' + mboxFile, current_labels[label], message_hashes, conn)
+        number_messages, number_failed = migrateMBOX(service, dirName + '/' + mboxFile, current_labels[label], conn)
         
         total_messages += number_messages
         total_failed += number_failed
