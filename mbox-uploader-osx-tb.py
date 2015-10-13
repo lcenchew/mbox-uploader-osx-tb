@@ -146,7 +146,7 @@ def createLabel(service, user_id, label_object):
     try:
         label = service.users().labels().create(userId=user_id,
                                                 body=label_object).execute()
-        print("\rLabel created for folder: {0}".format((label_object['name'].ljust(55,' ')[:53] + '..') if len(label_object['name'].ljust(55,' ')) > 55 else label_object['name'].ljust(55,' '))),
+        print("\rLabel created for folder: {0}".format((label_object['name'].ljust(55,' ')[:53] + '..') if len(label_object['name'].ljust(55,' ')) > 55 else label_object['name'].ljust(55,' ')))
         logging.info("Label created for folder: {0}".format(label_object['name']))
         return label['id']
     except errors.HttpError, error:

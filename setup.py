@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='mbox-uploader-osx-tb',
-      version='1.0',
+      version='1.01',
       description='Thunderbird|GMail mbox uploader for OS X',
       author='Doug Campbell',
       author_email='wdouglascampbell@hotmail.com',
