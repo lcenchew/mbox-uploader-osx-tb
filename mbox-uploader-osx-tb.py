@@ -359,6 +359,12 @@ def migrateMBOX(service, file, label, message_hashes, conn):
         # extract raw message
         msg = message.as_string()
         
+        # check message size is not greater than 35MB - 1024B (overhead just in case)
+        if len(msg) > 36699136:
+            # message is to big for Gmail to import
+            logging.info("Message %s of %s - Message is greater than 35MB.  Cannot upload." % (msg_number,total_messages))
+            continue
+
         # create file object to stream message contents
         fh = io.BytesIO(msg)
         
