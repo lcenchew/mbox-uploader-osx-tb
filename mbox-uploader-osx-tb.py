@@ -500,6 +500,7 @@ current_labels["INBOX"] = "INBOX"
 current_labels["Inbox"] = "INBOX"
 current_labels["Incoming"] = "INBOX"
 current_labels["SENT"] = "SENT"
+current_labels["Sent"] = "SENT"
 
 # Set to Thunderbird Profiles directory
 TBPROFILES = os.path.expanduser('~') + '/Library/Thunderbird/Profiles'
